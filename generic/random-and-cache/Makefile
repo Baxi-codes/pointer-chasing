@@ -2,7 +2,7 @@ x64:
 	nasm -f elf64 -o x64-sequential.o x64-sequential.asm
 	nasm -f elf64 -o x64-random.o x64-random.asm
 	nasm -f elf64 -o x64-random-atomic.o x64-random-atomic.asm
-	g++ -O2 -g -o ubench-x64 $(CXXFLAGS) -static main.cpp x64-sequential.o x64-random.o x64-random-atomic.o -lrt -fopenmp
+	g++ -O2 -g -o ubench-x64 $(CXXFLAGS) -static main.cpp x64-sequential.o x64-random.o x64-random-atomic.o -lrt -fopenmp -L. -lbench -lpapi -lraplcap-powercap -lpowercap -lcpufreq-bindings
 k1om:
 	x86_64-k1om-linux-as --march=k1om -o k1om-sequential.o k1om-sequential.asm
 	x86_64-k1om-linux-as --march=k1om -o k1om-random.o k1om-random.asm

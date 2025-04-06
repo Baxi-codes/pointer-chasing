@@ -20,13 +20,16 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <stdio.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <malloc.h>
 #include <string.h>
 #include <assert.h>
 #include <time.h>
+#include <math.h>
 #ifndef __ANDROID__
 	#include <omp.h>
 #endif
+#include <emmintrin.h>
 
 class XorShift {
 public:
@@ -563,6 +566,23 @@ void Benchmark_ReadSequential(void (*memory_read_function)(const void*, size_t),
 	printf ("%s" "\t" "%4.03lf\n", function_name, gbps);
 }
 
+#define POLYBENCH_CACHE_SIZE_KB 32770
+
+void polybench_flush_cache() {
+  int cs = POLYBENCH_CACHE_SIZE_KB * 1024 / sizeof(double);
+  double *flush = (double *)calloc(cs, sizeof(double));
+  int i;
+  double tmp = 0.0;
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+ : tmp) private(i)
+#endif
+  for (i = 0; i < cs; i++)
+    tmp += flush[i];
+  assert(tmp <= 10.0);
+  free(flush);
+}
+
+
 void Benchmark_ReadCacheRandom(void (*memory_read_function)(const void*, size_t), const char* function_name, const void* memory, size_t bytes, size_t read_iterations, size_t bytes_per_access) {
 	const uint64_t start = timer::get_nsecs ();
 	for (size_t iteration = 0; iteration < read_iterations; iteration++) {
@@ -919,12 +939,16 @@ int main(int argc, char** argv) {
 	 * e.g., DRAM test ==> Large; 
 		 Cache test ==> ~2 * lower level cache <= size <= ~1/4 cache size
 	 */
-	const size_t array_length = 1024 * 1024 * 32;
-
+	if (argc < 2) {
+		printf("Usage: %s <size in KiB>", argv[0]);
+		return 1;
+	}
+	const size_t array_length = (atoi(argv[1])*256);
+	const size_t num_bits = floor(log2(array_length));
 	/* Number of iterations */
-	const size_t random_iterations = 32;
+	const size_t random_iterations = 32*1000;
 	/* Number of iterations */
-	const size_t read_iterations = 1024 * 512;
+	const size_t read_iterations = 1024 * 512*1000;
 
 	/* Allocate and initialize memory */
 	uint32_t* data = (uint32_t*) memalign (64, array_length * 
@@ -970,16 +994,16 @@ int main(int argc, char** argv) {
 /* =================================================================== */
 #if defined(UBENCH_TEST_RANDOM_POINTER_CHASING)
 /* This is the pointer chasing version that "randomly" traverses all
-	 the elements in an array using a shift-based algorithm */
-	{
-		printf("Version" "\t" "MA/s" "\n");
-
+the elements in an array using a shift-based algorithm */
+{
+	_mm_mfence();
+	printf("Version" "\t" "MA/s" "\n");
 		/* The shifting algorithm used for generating the "pointer chasing" 
 			 array 
 			 25 is the number of bits representing the size of the array 
 		   for array_length = 1024 * 1024 * 32 = 32M ==> 25 bits 
 		 */
-		XorShift rng = XorShift(1u, 25);
+		XorShift rng = XorShift(1u, num_bits);
 		uint32_t prevIndex = 1;
 		data[0] = 1;
 		/* initialize the array using the algorithm */
@@ -1015,7 +1039,6 @@ int main(int argc, char** argv) {
 		double secs = double(end - start) / 1.0e+9;
 		/* Millions of accesses per second */
 		double maps = mega_accesses / secs;
-
 		#ifdef __arm__
 			printf("%s" "\t" "%4.03lf\n", "LDR", maps);
 		#else

@@ -1,0 +1,12 @@
+Running ./ubench-x64 12
+Median for size 12: 6201.884 MA/s
+Latency per access: 1.0000000000e-10 s
+Running ./ubench-x64 368
+Median for size 368: 2202.035 MA/s
+Latency per access: 4.0000000000e-10 s
+Running ./ubench-x64 6144
+Median for size 6144: 560.790 MA/s
+Latency per access: 1.7000000000e-09 s
+Running ./ubench-x64 524288
+Median for size 524288: 95.980 MA/s
+Latency per access: 1.0400000000e-08 s
