@@ -10,8 +10,8 @@ step=$3
 runs=5
 outfile="ubench_latency_vs_freq.csv"
 
-sizes=(12 368 6144)
-levels=("L1" "L2" "L3")
+sizes=(12 368 6144 4000000)
+levels=("L1" "L2" "L3" "DRAM")
 
 # Header for CSV
 echo "frequency_hz,size_kb,level,throughput_ma_s,latency_s" > "$outfile"
@@ -26,12 +26,12 @@ median() {
 # Loop through frequencies
 for ((freq=min_freq; freq<=max_freq; freq+=step)); do
   echo "Setting CPU frequency to $freq kHz"
-  if (( freq <= 2700000 )); then
-    sudo cpupower frequency-set -g userspace > /dev/null
-    sudo cpupower frequency-set -f ${freq} > /dev/null
-  else
-    ./scale.sh "$freq"
-  fi
+  #if (( freq <= 2700000 )); then
+  #  sudo cpupower frequency-set -g userspace > /dev/null
+  #  sudo cpupower frequency-set -f ${freq} > /dev/null
+  #else
+  sudo ./scale.sh "$freq"
+  #fi
 
   for i in "${!sizes[@]}"; do
     size=${sizes[$i]}

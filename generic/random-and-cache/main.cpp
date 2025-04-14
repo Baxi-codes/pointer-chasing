@@ -31,6 +31,15 @@ OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #endif
 #include <emmintrin.h>
 
+
+extern "C" {
+unsigned long long _mlir_ciface_get_energy();
+void _mlir_ciface_start_energy_time();
+void _mlir_ciface_set_frequency_caps(long int core, long uncore);
+void _mlir_ciface_stop_energy_time();
+void _mlir_ciface_print_energy_time();
+}
+
 class XorShift {
 public:
 	inline XorShift(uint32_t state, uint32_t bits) {
@@ -1021,7 +1030,7 @@ the elements in an array using a shift-based algorithm */
 		for (size_t i = 0; i < 12; i++) {
 			initialVector[i] = (array_length / 12) * i + 1;
 		}
-
+		_mlir_ciface_start_energy_time();
 		const uint64_t start = timer::get_nsecs();
 		/* For ARM processors */
 		#ifdef __arm__
@@ -1033,7 +1042,8 @@ the elements in an array using a shift-based algorithm */
 																						 initialVector);
 		#endif
 		const uint64_t end = timer::get_nsecs();
-
+		_mlir_ciface_stop_energy_time();
+		_mlir_ciface_print_energy_time();
 		/* Total number of accesses */
 		double mega_accesses = double(array_length) * 12.0 / 1.0e+6;
 		double secs = double(end - start) / 1.0e+9;
