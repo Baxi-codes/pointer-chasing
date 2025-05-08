@@ -53,4 +53,3 @@ for ((freq=min_freq; freq<=max_freq; freq+=step)); do
     printf "%s,%s,%s,%s,%.3e\n" "$freq" "$size" "$level" "$med" "$latency" >> "$outfile"
   done
 done
-

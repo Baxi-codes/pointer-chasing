@@ -7,11 +7,7 @@ fi
 
 CPU_FREQ=$1
 
-
-for cpu in /sys/devices/system/cpu/cpu*/cpufreq/; do
-    echo 5000000 | sudo tee $cpu/scaling_min_freq
-    echo 5000000 | sudo tee $cpu/scaling_max_freq
-done
-
 echo $CPU_FREQ | sudo tee /sys/devices/system/cpu/intel_uncore_frequency/package_00_die_00/min_freq_khz
 echo $CPU_FREQ | sudo tee /sys/devices/system/cpu/intel_uncore_frequency/package_00_die_00/max_freq_khz
+
+
