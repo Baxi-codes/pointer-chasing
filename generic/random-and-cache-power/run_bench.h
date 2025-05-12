@@ -310,15 +310,19 @@ std::vector<std::string> frequency_files_uncore = {
 double time_reading_ns = 0;
 double time_reading = 0;
 long long unsigned energy_reading = 0;
+long long unsigned energy_reading_core = 0;
 std::chrono::time_point<std::chrono::high_resolution_clock> start_time_counter;
 std::chrono::time_point<std::chrono::high_resolution_clock> end_time_counter;
 long long unsigned start_energy_counter = 0;
+long long unsigned start_energy_counter_core = 0;
 long long unsigned end_energy_counter = 0;
+long long unsigned end_energy_counter_core = 0;
 // Global max energy value
 long long unsigned energy_max = (1ULL << 32) - 1;
+long long unsigned energy_max_core = (1ULL << 32) - 1;
 std::atomic<bool> stop_event(false);
 std::thread counter_overflows;
-std::vector<int> energy_overflows = {-1};
+std::vector<int> energy_overflows = {-1,-1};
 double energy_j = 0.0;
 
 void cache_all_files_fd() {
@@ -363,20 +367,20 @@ void counter_thread(std::vector<int> &count) {
 
   // std::cout << "Energy overflow thread running" << std::endl;
   uint64_t energy_start = energy_time::energy_max;
-
-  if (energy_time::stop_event)
-    // std::cout << "Energy overflow stop event set to true";
+  uint64_t energy_start_core = energy_time::energy_max_core;
 
   while (!energy_time::stop_event) {
     try {
       unsigned long long energy = _mlir_ciface_get_energy();
+      unsigned long long energy_core = _mlir_ciface_get_energy_core();
       if (energy < energy_start) {
         count[0]++;
-        if (count[0] != 0) {
-          // std::cout << "Energy overflows" << std::endl;
-        }
+      }
+      if (energy_core < energy_start_core) {
+        count[1]++;
       }
       energy_start = energy;
+      energy_start_core = energy_core;
     } catch (const std::exception &e) {
       std::cerr << "Error in reading the energy: " << e.what() << std::endl;
       std::exit(1);
@@ -389,6 +393,32 @@ unsigned long long get_max_energy() {
   unsigned long long energy_uj;
   std::ifstream energy_file(
       "/sys/class/powercap/intel-rapl:0/max_energy_range_uj");
+
+  // Check if the file was opened successfully
+  if (!energy_file.is_open()) {
+    std::cerr << "Failed to open energy_uj file" << std::endl;
+    throw std::runtime_error("File opening failed");
+  }
+
+  // Read the energy value
+  energy_file >> energy_uj;
+  if (energy_file.fail()) {
+    std::cerr << "Failed to read energy" << std::endl;
+    energy_file.close();
+    throw std::runtime_error("File reading failed");
+  }
+#ifdef HUMAN_READABLE
+  std::cout << "Max core energy : " << energy_uj << " uJ" << std::endl;
+#endif
+  // Close the file
+  energy_file.close();
+  return energy_uj;
+}
+
+unsigned long long get_max_energy_core() {
+  unsigned long long energy_uj;
+  std::ifstream energy_file(
+      "/sys/class/powercap/intel-rapl:0:0/max_energy_range_uj");
 
   // Check if the file was opened successfully
   if (!energy_file.is_open()) {
@@ -467,11 +497,38 @@ unsigned long long _mlir_ciface_get_energy() {
   return energy_uj;
 }
 
+unsigned long long _mlir_ciface_get_energy_core() {
+  unsigned long long energy_uj;
+  std::ifstream energy_file("/sys/class/powercap/intel-rapl:0/energy_uj");
+
+  // Check if the file was opened successfully
+  if (!energy_file.is_open()) {
+    std::cerr << "Failed to open energy_uj file" << std::endl;
+    throw std::runtime_error("File opening failed");
+  }
+
+  // Read the energy value
+  energy_file >> energy_uj;
+  if (energy_file.fail()) {
+    std::cerr << "Failed to read energy" << std::endl;
+    energy_file.close();
+    throw std::runtime_error("File reading failed");
+  }
+#ifdef HUMAN_READABLE
+  std::cout << "Energy core: " << energy_uj << " uJ" << std::endl;
+#endif
+  // Close the file
+  energy_file.close();
+  return energy_uj;
+}
+
 void _mlir_ciface_start_energy_time() {
   energy_time::getScalingMaxFreqFiles();
   energy_time::start_time_counter = std::chrono::high_resolution_clock::now();
   energy_time::energy_max = get_max_energy();
+  energy_time::energy_max_core = get_max_energy_core();
   energy_time::start_energy_counter = _mlir_ciface_get_energy();
+  energy_time::start_energy_counter_core = _mlir_ciface_get_energy_core();
   if (energy_time::stop_event) {
     // std::cout << "Energy overflow check thread stop event set to true might be "
     //              "an error";
@@ -483,6 +540,7 @@ void _mlir_ciface_start_energy_time() {
 
 void _mlir_ciface_stop_energy_time() {
   energy_time::end_energy_counter = _mlir_ciface_get_energy();
+  energy_time::end_energy_counter_core = _mlir_ciface_get_energy_core();
   energy_time::end_time_counter = std::chrono::high_resolution_clock::now();
   energy_time::stop_event = true;
   energy_time::counter_overflows.join();
@@ -501,10 +559,22 @@ void _mlir_ciface_print_power() {
     energy_time::energy_reading =
         energy_time::end_energy_counter - energy_time::start_energy_counter;
   }
+  if (energy_time::energy_overflows[1] > 0) {
+    // std::cout << "Number of times Energy Overflowed : "
+    //           << energy_time::energy_overflows[1] << std::endl;
+    energy_time::energy_reading_core =
+        (energy_time::end_energy_counter_core -
+         energy_time::start_energy_counter_core) +
+        (energy_time::energy_overflows[1] * energy_time::energy_max_core);
+  } else {
+    energy_time::energy_reading_core =
+        energy_time::end_energy_counter_core -
+        energy_time::start_energy_counter_core;
+  }
   energy_time::time_reading_ns =
       std::chrono::duration_cast<std::chrono::nanoseconds>(timing).count();
   energy_time::time_reading = double(energy_time::time_reading_ns) / 1000000000;
-  energy_time::energy_j = double(energy_time::energy_reading) / 1000000;
+  energy_time::energy_j = double(energy_time::energy_reading - energy_time::energy_reading_core) / 1000000;
 #ifdef HUMAN_READABLE
   std::cerr << "Measured Energy (J) : " << energy_time::energy_j << std::endl;
   std::cerr << "Measured Time (s) : " << energy_time::time_reading << std::endl;
