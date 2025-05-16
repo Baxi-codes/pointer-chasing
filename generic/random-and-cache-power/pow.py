@@ -51,10 +51,10 @@ def main():
       run_command(f"sudo ./scale.sh {freq}")
 
       measurements = []  # list of (energy, time, power)
-      for i in range(15):
-        print(f"  Run {i+1}/15...")
+      for i in range(5):
+        print(f"  Run {i+1}/5...")
         run_command("likwid-memsweeper")
-        output = run_command("sudo ./ubench-x64 300000")
+        output = run_command("sudo ./ubench-x64 4000000")
         try:
           e, t, p = parse_metrics(output)
         except ValueError as ex:

@@ -361,6 +361,7 @@ void getScalingMaxFreqFiles() {
 } // namespace energy_time
 
 extern "C" unsigned long long _mlir_ciface_get_energy();
+extern "C" unsigned long long _mlir_ciface_get_energy_core();
 
 // Function for the counter thread
 void counter_thread(std::vector<int> &count) {
@@ -499,7 +500,7 @@ unsigned long long _mlir_ciface_get_energy() {
 
 unsigned long long _mlir_ciface_get_energy_core() {
   unsigned long long energy_uj;
-  std::ifstream energy_file("/sys/class/powercap/intel-rapl:0/energy_uj");
+  std::ifstream energy_file("/sys/class/powercap/intel-rapl:0:0/energy_uj");
 
   // Check if the file was opened successfully
   if (!energy_file.is_open()) {
@@ -585,7 +586,7 @@ void _mlir_ciface_print_power() {
   std::cerr << "End Energy (uJ) " << energy_time::end_energy_counter
             << std::endl;
 #endif
-  std::cout << energy_time::energy_j / energy_time::time_reading << std::endl;
+  std::cout << energy_time::energy_j << " " << energy_time::time_reading << " " << energy_time::energy_j / energy_time::time_reading << std::endl;
 }
 
 void _mlir_ciface_printOpen() { std::cout << "( "; }
